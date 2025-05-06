@@ -1,158 +1,177 @@
-document.addEventListener('DOMContentLoaded', function() {
-    // DOM Elements
+document.addEventListener('DOMContentLoaded', function () {
     const homeLink = document.getElementById('home-link');
     const scoresLink = document.getElementById('scores-link');
     const homeSection = document.getElementById('home-section');
     const scoresSection = document.getElementById('scores-section');
     const nameForm = document.getElementById('name-form');
+    const nameInput = document.getElementById('name');
     const messageDiv = document.getElementById('message');
     const scoresBody = document.getElementById('scores-body');
     const refreshBtn = document.getElementById('refresh-btn');
+    const timerDisplay = document.getElementById('timer-display');
+    const stopBtn = document.getElementById('stop-timer-btn');
+
+    let startTime = null;
+    let timerInterval = null;
+
+    // Confetti
+    function createConfetti() {
+        const confettiCount = 80;
+        for (let i = 0; i < confettiCount; i++) {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti';
+            const size = Math.random() * 10 + 5;
+            const colors = ['#FF5F9E', '#4FACFE', '#B465DA', '#00F5A0', '#FFC300'];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            confetti.style.cssText = `width: ${size}px; height: ${size}px; background: ${color};
+                                      position: fixed; top: -10px; left: ${Math.random() * 100}vw;
+                                      opacity: ${Math.random() + 0.5}; border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+                                      z-index: 1000; pointer-events: none; animation: confetti-fall ${Math.random() * 3 + 2}s ease-in forwards;`;
+            document.body.appendChild(confetti);
+            setTimeout(() => confetti.remove(), 4000);
+        }
+    }
+
+    const style = document.createElement('style');
+    style.textContent = `@keyframes confetti-fall { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(100vh) rotate(720deg); } }`;
+    document.head.appendChild(style);
 
     // Navigation
-    homeLink.addEventListener('click', function(e) {
+    homeLink.addEventListener('click', e => {
         e.preventDefault();
         showSection(homeSection, homeLink);
     });
 
-    scoresLink.addEventListener('click', function(e) {
+    scoresLink.addEventListener('click', e => {
         e.preventDefault();
         showSection(scoresSection, scoresLink);
         loadScores();
     });
 
-    // Form submission
-    nameForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const nameInput = document.getElementById('name');
-        const name = nameInput.value.trim();
-
-        if (name) {
-            registerName(name);
-        }
+    refreshBtn.addEventListener('click', function () {
+        loadScores();
+        this.classList.add('clicked');
+        setTimeout(() => this.classList.remove('clicked'), 300);
     });
 
-    // Refresh scores
-    refreshBtn.addEventListener('click', loadScores);
+    // Formulaire pour démarrer le chrono
+    nameForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const name = nameInput.value.trim();
+        if (name === "") {
+            showMessage("Entre ton nom pour commencer !", "error");
+            return;
+        }
 
-    // Function to show a section and highlight its nav link
+        showMessage(`C’est parti ${name} ! Appuie sur "Arrêter le chrono" quand tu veux.`, "success");
+
+        startTime = Date.now();
+        stopBtn.style.display = "inline-block";
+        timerDisplay.textContent = "Temps : 0.000s";
+
+        // Mettre à jour le temps toutes les 50ms
+        timerInterval = setInterval(() => {
+            const elapsed = (Date.now() - startTime) / 1000;
+            timerDisplay.textContent = `Temps : ${elapsed.toFixed(3)}s`;
+        }, 50);
+    });
+
+    // Arrêter le chrono et enregistrer le score
+    stopBtn.addEventListener('click', function () {
+        if (!startTime) return;
+
+        clearInterval(timerInterval);
+        const finalTime = Date.now() - startTime;
+        timerDisplay.textContent = `Temps final : ${(finalTime / 1000).toFixed(3)}s`;
+
+        showMessage("Chrono arrêté ! Score en cours d’enregistrement...", "success");
+        stopBtn.style.display = "none";
+
+        const name = nameInput.value.trim();
+        envoyerScore(name, finalTime); // temps en millisecondes
+    });
+
+    // Afficher les sections
     function showSection(section, link) {
         document.querySelectorAll('.section, .active-section').forEach(s => {
             s.classList.remove('active-section');
             s.classList.add('section');
         });
-
         section.classList.remove('section');
         section.classList.add('active-section');
-
         document.querySelectorAll('.nav-btn').forEach(a => a.classList.remove('active'));
         link.classList.add('active');
     }
 
-    // Function to register a name
-    function registerName(name) {
-        // Simulé, à remplacer par un fetch si besoin
-        setTimeout(() => {
-            showMessage('Enregistrement réussi ! ' + name + ' a été ajouté à la base de données.', 'success');
-            document.getElementById('name').value = '';
-        }, 500);
-    }
-
-    // Envoi du score (à appeler depuis ton jeu)
-    function sendScore(username, score) {
-        fetch('https://natan.alwaysdata.net/insert_score.php', {
+    // Enregistrer le score dans la BDD
+    function envoyerScore(nom, score) {
+        fetch('register.php', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `username=${encodeURIComponent(username)}&score=${encodeURIComponent(score)}`
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nom: nom, score: score })
         })
-        .then(response => response.text())
+        .then(response => response.json())
         .then(data => {
-            console.log(data);
-            showMessage(data.includes("succès") ? "Score envoyé avec succès !" : "Erreur : " + data, data.includes("succès") ? "success" : "error");
-            loadScores();
+            if (data.success) {
+                showMessage(`${nom} a été enregistré avec ${score} ms ! 🎉`, 'success');
+                nameInput.value = '';
+                createConfetti();
+            } else {
+                showMessage("Erreur : " + data.error, 'error');
+            }
         })
         .catch(error => {
-            showMessage("Erreur de connexion : " + error.message, "error");
+            showMessage("Erreur réseau : " + error.message, 'error');
         });
     }
 
-    // Récupération des scores
+    // Charger les scores
     function loadScores() {
-        fetch('https://natan.alwaysdata.net/get_scores.php')
+        fetch('scores.php')
             .then(response => response.json())
-            .then(scores => {
-                displayScores(scores);
+            .then(data => {
+                if (data.success) {
+                    displayScores(data.scores);
+                } else {
+                    showMessage("Impossible de charger les scores : " + data.error, 'error');
+                }
             })
             .catch(error => {
-                showMessage("Erreur chargement scores : " + error.message, "error");
+                showMessage("Erreur réseau : " + error.message, 'error');
             });
     }
-
-    // Affichage des scores
+    
     function displayScores(scores) {
-        scoresBody.innerHTML = '';
-
-        // Tri par meilleur temps (plus rapide en haut)
-        scores.sort((a, b) => a.temps_reaction - b.temps_reaction);
-
+        scoresBody.innerHTML = '';  // Vide le tableau avant d'afficher les nouveaux scores
+    
+        if (scores.length === 0) {
+            scoresBody.innerHTML = '<tr><td colspan="4">Aucun score disponible</td></tr>';
+            return;
+        }
+    
         scores.forEach((score, index) => {
             const row = document.createElement('tr');
-
-            let rankDisplay = `${index + 1}`;
-            if (index === 0) rankDisplay = `<span class="rank gold">1</span>`;
-            else if (index === 1) rankDisplay = `<span class="rank silver">2</span>`;
-            else if (index === 2) rankDisplay = `<span class="rank bronze">3</span>`;
-
+            const rank = index + 1;
+            const emoji = rank === 1 ? '👑' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+    
             row.innerHTML = `
-                <td>${rankDisplay}</td>
-                <td>${score.nom}</td>
-                <td>${score.temps_reaction} ms</td>
-                <td>${score.date_partie}</td>
+                <td>${rank}</td>
+                <td>${score.Nom} ${emoji}</td>
+                <td>${score.Temps} ms</td>
+                <td>${score.Date}</td>
             `;
             scoresBody.appendChild(row);
         });
-
-        // Styles des médailles
-        if (!document.getElementById('rank-styles')) {
-            const style = document.createElement('style');
-            style.id = 'rank-styles';
-            style.textContent = `
-                .rank {
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 50%;
-                    color: white;
-                    font-weight: 600;
-                    font-size: 12px;
-                }
-                .gold {
-                    background: linear-gradient(45deg, #FFD700, #FFC107);
-                    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.5);
-                }
-                .silver {
-                    background: linear-gradient(45deg, #C0C0C0, #9E9E9E);
-                    box-shadow: 0 2px 8px rgba(158, 158, 158, 0.5);
-                }
-                .bronze {
-                    background: linear-gradient(45deg, #CD7F32, #BF6516);
-                    box-shadow: 0 2px 8px rgba(205, 127, 50, 0.5);
-                }
-            `;
-            document.head.appendChild(style);
-        }
     }
+    
 
-    // Affichage des messages (succès / erreur)
-    function showMessage(text, type) {
-        messageDiv.textContent = text;
-        messageDiv.className = 'message ' + type;
+    // Afficher un message de succès ou d'erreur
+    function showMessage(message, type) {
+        messageDiv.textContent = message;
+        messageDiv.className = type;
+        messageDiv.style.display = 'block';
         setTimeout(() => {
-            messageDiv.className = 'message';
-        }, 5000);
+            messageDiv.style.display = 'none';
+        }, 4000);
     }
 });
