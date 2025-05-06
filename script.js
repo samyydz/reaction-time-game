@@ -13,8 +13,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let startTime = null;
     let timerInterval = null;
-
-    // Confetti
+    
     function createConfetti() {
         const confettiCount = 80;
         for (let i = 0; i < confettiCount; i++) {
@@ -25,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const color = colors[Math.floor(Math.random() * colors.length)];
             confetti.style.cssText = `width: ${size}px; height: ${size}px; background: ${color};
                                       position: fixed; top: -10px; left: ${Math.random() * 100}vw;
-                                      opacity: ${Math.random() + 0.5}; border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+                                    opacity: ${Math.random() + 0.5}; border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
                                       z-index: 1000; pointer-events: none; animation: confetti-fall ${Math.random() * 3 + 2}s ease-in forwards;`;
             document.body.appendChild(confetti);
             setTimeout(() => confetti.remove(), 4000);
